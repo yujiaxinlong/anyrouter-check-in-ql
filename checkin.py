@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
 
-import httpx
+from curl_cffi import requests as cf_requests
 from dotenv import load_dotenv
 
 # 引入青龙面板自带的 notify 模块。青龙运行时会自动把 /ql/scripts/ 加入 sys.path，
@@ -493,7 +493,7 @@ async def check_in_account(account: AccountConfig, account_index: int, app_confi
 	if not all_cookies:
 		return False, None
 
-	client = httpx.Client(http2=True, timeout=30.0)
+	client = cf_requests.Session(impersonate='chrome131')
 
 	try:
 		client.cookies.update(all_cookies)
