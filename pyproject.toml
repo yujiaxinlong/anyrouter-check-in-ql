@@ -5,9 +5,14 @@ description = "Anyrouter or newapi system check in"
 requires-python = ">=3.11"
 dependencies = [
   "httpx[http2]>=0.24.0",
-  "playwright>=1.40.0",
   "python-dotenv>=1.0.0"
 ]
+
+# Playwright 是可选的，仅在你需要绕过 anyrouter 的阿里云 WAF 挑战时才装。
+# 默认部署（青龙、agentrouter-only、anyrouter 直连）都不需要。
+# 安装：`pip install '.[playwright]'` 或 `uv sync --extra playwright`
+[project.optional-dependencies]
+playwright = ["playwright>=1.40.0"]
 
 [dependency-groups]
 dev = [

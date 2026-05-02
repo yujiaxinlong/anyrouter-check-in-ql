@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = ">=3.11"
 
 [[package]]
@@ -22,8 +22,12 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
-    { name = "playwright" },
     { name = "python-dotenv" },
+]
+
+[package.optional-dependencies]
+playwright = [
+    { name = "playwright" },
 ]
 
 [package.dev-dependencies]
@@ -43,9 +47,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", extras = ["http2"], specifier = ">=0.24.0" },
-    { name = "playwright", specifier = ">=1.40.0" },
+    { name = "playwright", marker = "extra == 'playwright'", specifier = ">=1.40.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
+provides-extras = ["playwright"]
 
 [package.metadata.requires-dev]
 dev = [
