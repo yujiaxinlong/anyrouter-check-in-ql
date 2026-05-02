@@ -1,0 +1,4 @@
+# 青龙面板部署用依赖（不含 playwright）
+# 如需启用 anyrouter 的 WAF 绕过，需另行安装 playwright + chromium
+httpx[http2]>=0.24.0
+python-dotenv>=1.0.0

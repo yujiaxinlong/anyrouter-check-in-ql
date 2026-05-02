@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
 AnyRouter.top 自动签到脚本
+
+cron: 0 */6 * * *
+new Env('AnyRouter 签到');
 """
 
 import asyncio
@@ -12,14 +15,23 @@ from datetime import datetime
 
 import httpx
 from dotenv import load_dotenv
-from playwright.async_api import async_playwright
 
 from utils.config import AccountConfig, AppConfig, load_accounts_config
-from utils.notify import notify
+
+# 引入青龙面板自带的 notify 模块。青龙运行时会自动把 /ql/scripts/ 加入 sys.path，
+# 因此可以直接 `from notify import send`；非青龙环境（本地、GitHub Actions）会进入
+# ImportError 分支，此时跳过通知。需要本地通知的可手动把 notify.py 放到 PYTHONPATH。
+try:
+	from notify import send as _ql_send  # type: ignore
+except ImportError:
+	_ql_send = None
+	print('[INFO] Qinglong notify module not available, notifications will be skipped')
 
 load_dotenv()
 
-BALANCE_HASH_FILE = 'balance_hash.txt'
+# 使用脚本所在目录的绝对路径，避免不同调用方工作目录差异导致 hash 重置
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BALANCE_HASH_FILE = os.path.join(SCRIPT_DIR, 'balance_hash.txt')
 
 
 def load_balance_hash():
@@ -69,13 +81,28 @@ async def get_waf_cookies_with_playwright(account_name: str, login_url: str, req
 	"""使用 Playwright 获取 WAF cookies（隐私模式）"""
 	print(f'[PROCESSING] {account_name}: Starting browser to get WAF cookies...')
 
+	# 懒加载 playwright，未安装时给出友好提示而不是导入即崩
+	try:
+		from playwright.async_api import async_playwright
+	except ImportError:
+		print(
+			f'[FAILED] {account_name}: playwright is not installed. '
+			f'Either `pip install playwright && playwright install chromium`, '
+			f'or override this provider via PROVIDERS env to set bypass_method=null.'
+		)
+		return None
+
+	# 是否以无头模式启动浏览器，默认无头（服务器环境必须）；本地调试可设 PLAYWRIGHT_HEADLESS=0
+	headless_env = os.getenv('PLAYWRIGHT_HEADLESS', '1').strip().lower()
+	headless = headless_env not in ('0', 'false', 'no')
+
 	async with async_playwright() as p:
 		import tempfile
 
 		with tempfile.TemporaryDirectory() as temp_dir:
 			context = await p.chromium.launch_persistent_context(
 				user_data_dir=temp_dir,
-				headless=False,
+				headless=headless,
 				user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
 				viewport={'width': 1920, 'height': 1080},
 				args=[
@@ -470,8 +497,14 @@ async def main():
 		notify_content = '\n\n'.join([time_info, '\n'.join(notification_content), '\n'.join(summary)])
 
 		print(notify_content)
-		notify.push_message('AnyRouter Check-in Alert', notify_content, msg_type='text')
-		print('[NOTIFY] Notification sent due to failures or balance changes')
+		if _ql_send is not None:
+			try:
+				_ql_send('AnyRouter Check-in Alert', notify_content)
+				print('[NOTIFY] Notification sent via Qinglong notify')
+			except Exception as e:
+				print(f'[NOTIFY] Failed to send via Qinglong notify: {e}')
+		else:
+			print('[NOTIFY] Qinglong notify unavailable, notification skipped')
 	else:
 		print('[INFO] All accounts successful and no balance changes detected, notification skipped')
 

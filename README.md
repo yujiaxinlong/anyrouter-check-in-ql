@@ -1,417 +1,178 @@
-# Any Router 多账号自动签到
+# Any Router 多账号自动签到（青龙面板版）
 
-[![GitHub Actions](https://github.com/millylee/anyrouter-check-in/workflows/PR%20Quality%20Checks/badge.svg)](https://github.com/millylee/anyrouter-check-in/actions)
-[![codecov](https://codecov.io/gh/millylee/anyrouter-check-in/branch/main/graph/badge.svg)](https://codecov.io/gh/millylee/anyrouter-check-in)
-[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/millylee/anyrouter-check-in/main.svg)](https://results.pre-commit.ci/latest/github/millylee/anyrouter-check-in/main)
-[![Python Version](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/downloads/)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![License](https://img.shields.io/github/license/millylee/anyrouter-check-in)](LICENSE)
+多平台多账号自动签到，理论上支持所有 NewAPI、OneAPI 平台，目前内置支持 **AnyRouter** 与 **AgentRouter**，其它可根据下方文档摸索配置。
 
-多平台多账号自动签到，理论上支持所有 NewAPI、OneAPI 平台，目前内置支持 Any Router 与 Agent Router，其它可根据文档进行摸索配置。
+> 本仓库 fork 自 [millylee/anyrouter-check-in](https://github.com/millylee/anyrouter-check-in)，**专为青龙面板部署改造**：移除 GitHub Actions 工作流，通知统一走青龙内置 `notify.py`，默认跳过 Playwright（直连 API）。
 
-推荐搭配使用[Auo](https://github.com/millylee/auo)，支持任意 Claude Code Token 切换的工具。
-
-**维护开源不易，如果本项目帮助到了你，请帮忙点个 Star，谢谢!**
-
-用于 Claude Code 中转站 Any Router 网站多账号每日签到，一次 $25，限时注册即送 100 美金，[点击这里注册](https://anyrouter.top/register?aff=gSsN)。业界良心，支持 Claude Sonnet 4.5、GPT-5-Codex、Claude Code 百万上下文（使用 `/model sonnet[1m]` 开启），`gemini-2.5-pro` 模型。
+---
 
 ## 功能特性
 
 - ✅ 多平台（兼容 NewAPI 与 OneAPI）
-- ✅ 单个/多账号自动签到
-- ✅ 多种机器人通知（可选）
-- ✅ 绕过 WAF 限制
+- ✅ 单/多账号自动签到
+- ✅ 直接使用青龙面板的统一通知系统
+- ✅ 默认无需 Chromium（通过 `PROVIDERS` 关掉 WAF 绕过即可）
+- ✅ 余额变动时才发通知，避免噪音
 
-## 使用方法
+---
 
-### 1. Fork 本仓库
+## 快速开始
 
-点击右上角的 "Fork" 按钮，将本仓库 fork 到你的账户。
+📘 完整部署指南见 **[docs/qinglong.md](./docs/qinglong.md)**，含：
 
-### 2. 获取账号信息
+- 验证 anyrouter 是否需要 WAF 的方法
+- `ql repo` 拉库 / 订阅管理 UI 操作
+- 环境变量配置（`ANYROUTER_ACCOUNTS`、`PROVIDERS`）
+- 通知集成
+- 故障排查
 
-对于每个需要签到的账号，你需要获取：(可借助 [在线 Secrets 配置生成器](https://millylee.github.io/anyrouter-check-in/))
+---
 
-1. **Cookies**: 用于身份验证
-2. **API User**: 用于请求头的 new-api-user 参数（自己配置其它平台时该值需要注意匹配）
+## 获取账号信息
 
-#### 获取 Cookies：
+每个签到账号需要两个值：
 
-1. 打开浏览器，访问 https://anyrouter.top/
-2. 登录你的账户
-3. 打开开发者工具 (F12)
-4. 切换到 "Application" 或 "存储" 选项卡
-5. 找到 "Cookies" 选项
-6. 复制所有 cookies
+1. **Cookies**（用于身份验证）
+2. **API User**（请求头 `new-api-user` 的值）
 
-#### 获取 API User：
+也可以借助 [在线 Secrets 配置生成器](https://millylee.github.io/anyrouter-check-in/) 一键生成。
 
-按照下方图片教程操作获得。
+### 获取 Cookies
 
-### 3. 设置 GitHub Environment Secret
-
-1. 在你 fork 的仓库中，点击 "Settings" 选项卡
-2. 在左侧菜单中找到 "Environments" -> "New environment"
-3. 新建一个名为 `production` 的环境
-4. 点击新建的 `production` 环境进入环境配置页
-5. 点击 "Add environment secret" 创建 secret：
-   - Name: `ANYROUTER_ACCOUNTS`
-   - Value: 你的多账号配置数据
-
-### 4. 多账号配置格式
-
-支持单个与多个账号配置，可选 `name` 和 `provider` 字段：
-
-```json
-[
-  {
-    "name": "我的主账号",
-    "cookies": {
-      "session": "account1_session_value"
-    },
-    "api_user": "account1_api_user_id"
-  },
-  {
-    "name": "备用账号",
-    "provider": "agentrouter",
-    "cookies": {
-      "session": "account2_session_value"
-    },
-    "api_user": "account2_api_user_id"
-  }
-]
-```
-
-**字段说明**：
-
-- `cookies` (必需)：用于身份验证的 cookies 数据
-- `api_user` (必需)：用于请求头的 new-api-user 参数
-- `provider` (可选)：指定使用的服务商，默认为 `anyrouter`
-- `name` (可选)：自定义账号显示名称，用于通知和日志中标识账号
-
-**默认值说明**：
-
-- 如果未提供 `provider` 字段，默认使用 `anyrouter`（向后兼容）
-- 如果未提供 `name` 字段，会使用 `Account 1`、`Account 2` 等默认名称
-- `anyrouter` 与 `agentrouter` 配置已内置，无需填写
-
-接下来获取 cookies 与 api_user 的值。
-
-通过 F12 工具，切到 Application 面板，拿到 session 的值，最好重新登录下，该值 1 个月有效期，但有可能提前失效，失效后报 401 错误，到时请再重新获取。
+1. 浏览器访问 https://anyrouter.top/ 并登录
+2. F12 → Application → Cookies，复制 `session` 值（建议先重新登录确保最新，session 名义有效期 1 个月，但有时会提前失效，401 时重新获取）
 
 ![获取 cookies](./assets/request-session.png)
 
-通过 F12 工具，切到 Network 面板，可以过滤下，只要 Fetch/XHR，找到带 `New-Api-User`，这个值正常是 5 位数，如果是负数或者个位数，正常是未登录。
+### 获取 API User
+
+F12 → Network → 过滤 Fetch/XHR，找到带 `New-Api-User` 请求头的请求。该值正常是 5 位数；如果是负数或个位数，说明未登录。
 
 ![获取 api_user](./assets/request-api-user.png)
 
-### 5. 启用 GitHub Actions
+---
 
-1. 在你的仓库中，点击 "Actions" 选项卡
-2. 如果提示启用 Actions，请点击启用
-3. 找到 "AnyRouter 自动签到" workflow
-4. 点击 "Enable workflow"
+## 多账号配置格式
 
-### 6. 测试运行
-
-你可以手动触发一次签到来测试：
-
-1. 在 "Actions" 选项卡中，点击 "AnyRouter 自动签到"
-2. 点击 "Run workflow" 按钮
-3. 确认运行
-
-![运行结果](./assets/check-in.png)
-
-## 执行时间
-
-- 脚本每 6 小时执行一次（1. action 无法准确触发，基本延时 1~1.5h；2. 目前观测到 anyrouter 的签到是每 24h 而不是零点就可签到）
-- 你也可以随时手动触发签到
-
-## 注意事项
-
-- 请确保每个账号的 cookies 和 API User 都是正确的
-- 可以在 Actions 页面查看详细的运行日志
-- 支持部分账号失败，只要有账号成功签到，整个任务就不会失败
-- 报 401 错误，请重新获取 cookies，理论 1 个月失效，但有 Bug，详见 [#6](https://github.com/millylee/anyrouter-check-in/issues/6)
-- 请求 200，但出现 Error 1040（08004）：Too many connections，官方数据库问题，目前已修复，但遇到几次了，详见 [#7](https://github.com/millylee/anyrouter-check-in/issues/7)
-
-## 配置示例
-
-### 基础配置（向后兼容）
-
-假设你有两个账号需要签到，不指定 provider 时默认使用 anyrouter：
-
-```json
-[
-  {
-    "cookies": {
-      "session": "abc123session"
-    },
-    "api_user": "user123"
-  },
-  {
-    "cookies": {
-      "session": "xyz789session"
-    },
-    "api_user": "user456"
-  }
-]
-```
-
-### 多服务商配置
-
-如果你需要同时使用多个服务商（如 anyrouter 和 agentrouter）：
+环境变量名：`ANYROUTER_ACCOUNTS`，JSON 数组，**单行**：
 
 ```json
 [
   {
     "name": "AnyRouter 主账号",
     "provider": "anyrouter",
-    "cookies": {
-      "session": "abc123session"
-    },
+    "cookies": { "session": "abc123session" },
     "api_user": "user123"
   },
   {
     "name": "AgentRouter 备用",
     "provider": "agentrouter",
-    "cookies": {
-      "session": "xyz789session"
-    },
+    "cookies": { "session": "xyz789session" },
     "api_user": "user456"
   }
 ]
 ```
 
-## 自定义 Provider 配置（可选）
+**字段说明**
 
-默认情况下，`anyrouter`、`agentrouter` 已内置配置，无需额外设置。如果你需要使用其他服务商，可以通过环境变量 `PROVIDERS` 配置：
+| 字段 | 必需 | 说明 |
+|---|---|---|
+| `cookies` | ✅ | 身份验证 cookies |
+| `api_user` | ✅ | 请求头 `new-api-user` 的值 |
+| `provider` | ❌ | 服务商名，默认 `anyrouter`，内置可选 `agentrouter` |
+| `name` | ❌ | 自定义账号显示名（用于日志/通知） |
 
-### 基础配置（仅域名）
+---
 
-大多数情况下，只需提供 `domain` 即可，其他路径会自动使用默认值：
+## 自定义 Provider（可选）
+
+默认已内置 `anyrouter` 与 `agentrouter`。若需对接其它 NewAPI/OneAPI 站，或修改默认 provider 行为，设置环境变量 `PROVIDERS`：
 
 ```json
 {
+  "anyrouter": {
+    "domain": "https://anyrouter.top",
+    "bypass_method": null
+  },
   "customrouter": {
     "domain": "https://custom.example.com"
   }
 }
 ```
 
-### 完整配置（自定义路径）
+**字段说明**
 
-如果服务商使用了不同的 API 路径、请求头或需要 WAF 绕过，可以额外指定：
+| 字段 | 默认值 | 说明 |
+|---|---|---|
+| `domain` | （必需） | 服务商域名 |
+| `login_path` | `/login` | 登录页路径（仅 `bypass_method=waf_cookies` 时使用） |
+| `sign_in_path` | `/api/user/sign_in` | 签到接口；设 `null` 表示访问用户信息时自动完成签到 |
+| `user_info_path` | `/api/user/self` | 用户信息接口 |
+| `api_user_key` | `new-api-user` | 用户标识请求头名 |
+| `bypass_method` | `null` | `"waf_cookies"` 启用 Playwright 绕过；`null` 直连 |
+| `waf_cookie_names` | `null` | WAF cookie 名列表，`bypass_method=waf_cookies` 时必填 |
 
-```json
-{
-  "customrouter": {
-    "domain": "https://custom.example.com",
-    "login_path": "/auth/login",
-    "sign_in_path": "/api/checkin",
-    "user_info_path": "/api/profile",
-    "api_user_key": "New-Api-User",
-    "bypass_method": "waf_cookies",
-    "waf_cookie_names": ["acw_tc", "cdn_sec_tc", "acw_sc__v2"]
-  }
-}
+**关键提示**：内置 `anyrouter` 默认 `bypass_method="waf_cookies"`，需要 Playwright + Chromium。**青龙部署建议覆盖为 `null` 直连**：
+
+```
+PROVIDERS={"anyrouter":{"domain":"https://anyrouter.top","bypass_method":null}}
 ```
 
-**关于 `bypass_method`**：
+`agentrouter` 默认就是直连，无需配置。
 
-- 不设置或设置为 `null`：直接使用用户提供的 cookies 进行请求（适合无 WAF 保护的网站）
-- 设置为 `"waf_cookies"`：使用 Playwright 打开浏览器获取 WAF cookies 后再进行请求（适合有 WAF 保护的网站）
+---
 
-> 注：`anyrouter` 和 `agentrouter` 已内置默认配置，无需在 `PROVIDERS` 中配置
+## 通知
 
-### 在 GitHub Actions 中配置
+**已移除项目自带的通知模块**，统一通过青龙面板内置的 `notify.py` 推送。在青龙的 **系统设置 → 通知设置** 配置一次，所有脚本共享。
 
-1. 进入你的仓库 Settings -> Environments -> production
-2. 添加新的 secret：
-   - Name: `PROVIDERS`
-   - Value: 你的 provider 配置（JSON 格式）
+支持的通知渠道完全跟随青龙版本，常见包括：钉钉、飞书、企业微信、PushPlus、Server 酱、Telegram、Bark、Gotify、邮件、iGot、Synology Chat 等。
 
-**字段说明**：
+非青龙环境（本地）运行时，会自动跳过通知，签到本身不受影响。
 
-- `domain` (必需)：服务商的域名
-- `login_path` (可选)：登录页面路径，默认为 `/login`（仅在 `bypass_method` 为 `"waf_cookies"` 时使用）
-- `sign_in_path` (可选)：签到 API 路径，默认为 `/api/user/sign_in`
-- `user_info_path` (可选)：用户信息 API 路径，默认为 `/api/user/self`
-- `api_user_key` (可选)：API 用户标识请求头名称，默认为 `new-api-user`
-- `bypass_method` (可选)：WAF 绕过方法
-  - `"waf_cookies"`：使用 Playwright 打开浏览器获取 WAF cookies 后再执行签到
-  - 不设置或 `null`：直接使用用户 cookies 执行签到（适合无 WAF 保护的网站）
-- `waf_cookie_names` (可选)：绕过 WAF 所需 cookie 的名称列表，`bypass_method` 为 `waf_cookies` 时必须设置
+---
 
-**配置示例**（完整）：
+## 执行频率
 
-```json
-{
-  "customrouter": {
-    "domain": "https://custom.example.com",
-    "login_path": "/auth/login",
-    "sign_in_path": "/api/checkin",
-    "user_info_path": "/api/profile",
-    "api_user_key": "x-user-id",
-    "bypass_method": "waf_cookies"
-  }
-}
-```
+脚本头部 cron 默认 `0 */6 * * *`（每 6 小时一次）。可在青龙的定时任务中改为你期望的频率，比如 `0 0 * * *` 一天一次。
 
-**内置配置说明**：
-
-- `anyrouter`：
-  - `bypass_method: "waf_cookies"`（需要先获取 WAF cookies，然后执行签到）
-  - `sign_in_path: "/api/user/sign_in"`
-- `agentrouter`：
-  - `bypass_method: null`（直接使用用户 cookies 执行签到）
-  - `sign_in_path: "/api/user/sign_in"`
-
-**重要提示**：
-
-- `PROVIDERS` 是可选的，不配置则使用内置的 `anyrouter` 和 `agentrouter`
-- 自定义的 provider 配置会覆盖同名的默认配置
-
-## 开启通知
-
-脚本支持多种通知方式，可以通过配置以下环境变量开启，如果 `webhook` 有要求安全设置，例如钉钉，可以在新建机器人时选择自定义关键词，填写 `AnyRouter`。
-
-### 邮箱通知(STMP)
-
-- `EMAIL_USER`: 发件人邮箱地址/STMP 登录地址
-- `EMAIL_PASS`: 发件人邮箱密码/授权码
-- `EMAIL_SENDER`: 邮件显示的发件人地址(可选，默认: EMAIL_USER)
-- `CUSTOM_SMTP_SERVER`: 自定义发件人 SMTP 服务器(可选)
-- `EMAIL_TO`: 收件人邮箱地址
-
-### 钉钉机器人
-
-- `DINGDING_WEBHOOK`: 钉钉机器人的 Webhook 地址
-
-### 飞书机器人
-
-- `FEISHU_WEBHOOK`: 飞书机器人的 Webhook 地址
-
-### 企业微信机器人
-
-- `WEIXIN_WEBHOOK`: 企业微信机器人的 Webhook 地址
-
-### PushPlus 推送
-
-- `PUSHPLUS_TOKEN`: PushPlus 的 Token
-
-### Server 酱
-
-- `SERVERPUSHKEY`: Server 酱的 SendKey
-
-### Telegram Bot
-
-- `TELEGRAM_BOT_TOKEN`: Telegram Bot 的 Token
-- `TELEGRAM_CHAT_ID`: Telegram Chat ID
-
-### Gotify 推送
-
-- `GOTIFY_URL`: Gotify 服务的 URL 地址（例如: https://your-gotify-server/message）
-- `GOTIFY_TOKEN`: Gotify 应用的访问令牌
-- `GOTIFY_PRIORITY`: Gotify 消息优先级 (1-10, 默认为 9)
-
-### Bark 推送
-
-- `BARK_KEY`: Bark 应用的 Key（APP 打开时即可看到）
-- `BARK_SERVER`: 自建 Bark 服务器地址 (可选，默认: https://api.day.app)
-
-配置步骤：
-
-1. 在仓库的 Settings -> Environments -> production -> Environment secrets 中添加上述环境变量
-2. 每个通知方式都是独立的，可以只配置你需要的推送方式
-3. 如果某个通知方式配置不正确或未配置，脚本会自动跳过该通知方式
+---
 
 ## 故障排除
 
-如果签到失败，请检查：
+| 现象 | 原因 / 解决 |
+|---|---|
+| HTTP 401 | session 过期，重新抓 cookie 更新 `ANYROUTER_ACCOUNTS` |
+| `playwright is not installed` | 你某个 provider 仍设了 `bypass_method=waf_cookies` 但容器没装 Playwright。把它通过 `PROVIDERS` 改成 `null`，或装 `pip install playwright && playwright install chromium` |
+| Error 1040 (08004) Too many connections | 站点数据库瞬时问题，等下一轮 cron 即可 |
+| 没收到通知 | 检查青龙面板的「通知设置」是否配好；脚本日志里出现 `Qinglong notify module not available` 说明 `notify.py` 不在 `sys.path` 中（非青龙环境） |
+| 每次都发通知 | 余额发生变化才会通知；如果你余额一直在变（其他程序消耗），属于正常 |
 
-1. 账号配置格式是否正确
-2. cookies 是否过期
-3. API User 是否正确
-4. 网站是否更改了签到接口
-5. 查看 Actions 运行日志获取详细错误信息
+---
 
-## 本地开发环境设置
-
-如果你需要在本地测试或开发，请按照以下步骤设置：
+## 本地开发
 
 ```bash
-# 安装所有依赖
-uv sync --dev
+# 安装依赖
+uv sync
 
-# 安装 Playwright 浏览器
+# 装 Playwright 浏览器（仅当你要测试 anyrouter 的 WAF 绕过时）
 uv run playwright install chromium
 
-# 创建 .env 文件并配置（注意：JSON 必须是单行格式）
-# 示例：
-# ANYROUTER_ACCOUNTS=[{"name":"账号1","cookies":{"session":"xxx"},"api_user":"12345"}]
-# PROVIDERS={"agentrouter":{"domain":"https://agentrouter.org"}}
-
-# 运行签到脚本
+# 运行
 uv run checkin.py
 ```
 
-## 测试
+`.env` 中可设：
 
-```bash
-uv sync --dev
-
-# 安装 Playwright 浏览器
-uv run playwright install chromium
-
-# 运行测试
-uv run pytest tests/
-
-# 查看测试覆盖率
-uv run pytest tests/ --cov=. --cov-report=html
+```
+ANYROUTER_ACCOUNTS=[{"cookies":{"session":"xxx"},"api_user":"yyy"}]
+PROVIDERS={"anyrouter":{"domain":"https://anyrouter.top","bypass_method":null}}
+PLAYWRIGHT_HEADLESS=1
 ```
 
-## 贡献指南
-
-欢迎贡献代码！在提交 Pull Request 之前，请阅读[贡献指南](CONTRIBUTING.md)。
-
-### 代码质量
-
-本项目使用以下工具确保代码质量：
-
-- **Ruff**: 代码风格检查和格式化
-- **MyPy**: 静态类型检查
-- **Bandit**: 安全漏洞扫描
-- **Pytest**: 自动化测试
-- **pre-commit**: Git 提交前自动检查
-
-所有 Pull Request 会自动运行以下检查：
-
-- ✅ 代码风格检查（Ruff Lint & Format）
-- ✅ 类型检查（MyPy）
-- ✅ 安全扫描（Bandit）
-- ✅ 测试运行（Pytest）
-- ✅ 测试覆盖率报告（Codecov）
-
-### 本地开发
-
-```bash
-# 安装开发依赖
-uv sync --dev
-
-# 安装 pre-commit 钩子
-uv run pre-commit install
-
-# 运行代码检查
-uv run ruff check .
-uv run ruff format .
-uv run mypy .
-uv run bandit -r . -c pyproject.toml
-
-# 运行测试
-uv run pytest tests/ --cov=.
-```
+---
 
 ## 免责声明
 
-本脚本仅用于学习和研究目的，使用前请确保遵守相关网站的使用条款.
+本脚本仅用于学习和研究目的，使用前请确保遵守相关网站的使用条款。
