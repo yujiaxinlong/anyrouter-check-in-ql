@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import sys
+import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -364,7 +365,9 @@ def get_user_info(client, headers, user_info_url: str):
 				}
 		return {'success': False, 'error': f'Failed to get user info: HTTP {response.status_code}'}
 	except Exception as e:
-		return {'success': False, 'error': f'Failed to get user info: {str(e)[:50]}...'}
+		print(f'[ERROR] get_user_info raised: {e}')
+		traceback.print_exc()
+		return {'success': False, 'error': f'Failed to get user info: {e}'}
 
 
 async def prepare_cookies(account_name: str, provider_config, user_cookies: dict) -> dict | None:
@@ -531,7 +534,8 @@ async def check_in_account(account: AccountConfig, account_index: int, app_confi
 			return True, user_info_before, user_info_after
 
 	except Exception as e:
-		print(f'[FAILED] {account_name}: Error occurred during check-in process - {str(e)[:50]}...')
+		print(f'[FAILED] {account_name}: Error occurred during check-in process - {e}')
+		traceback.print_exc()
 		return False, None, None
 	finally:
 		client.close()
@@ -628,8 +632,9 @@ async def main():
 		except Exception as e:
 			account_name = account.get_display_name(i)
 			print(f'[FAILED] {account_name} processing exception: {e}')
+			traceback.print_exc()
 			need_notify = True  # 异常也需要通知
-			notification_content.append(f'[FAIL] {account_name} exception: {str(e)[:50]}...')
+			notification_content.append(f'[FAIL] {account_name} exception: {e}')
 
 	# 检查余额变化
 	current_balance_hash = generate_balance_hash(current_balances) if current_balances else None
