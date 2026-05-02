@@ -138,10 +138,25 @@ class AppConfig:
 					print('[WARNING] PROVIDERS must be a JSON object, ignoring custom providers')
 					return cls(providers=providers)
 
-				# 解析自定义 providers,会覆盖默认配置
+				# 解析自定义 providers，与内置默认配置合并（而非完全覆盖）
 				for name, provider_data in providers_data.items():
 					try:
-						providers[name] = ProviderConfig.from_dict(name, provider_data)
+						existing = providers.get(name)
+						if existing:
+							# 已有内置配置：以内置为基础，仅覆盖用户显式指定的字段
+							providers[name] = ProviderConfig(
+								name=name,
+								domain=provider_data.get('domain', existing.domain),
+								login_path=provider_data.get('login_path', existing.login_path),
+								sign_in_path=provider_data.get('sign_in_path', existing.sign_in_path),
+								user_info_path=provider_data.get('user_info_path', existing.user_info_path),
+								api_user_key=provider_data.get('api_user_key', existing.api_user_key),
+								bypass_method=provider_data.get('bypass_method', existing.bypass_method),
+								waf_cookie_names=provider_data.get('waf_cookie_names', existing.waf_cookie_names),
+							)
+						else:
+							# 全新 provider：使用 from_dict 的通用默认值
+							providers[name] = ProviderConfig.from_dict(name, provider_data)
 					except Exception as e:
 						print(f'[WARNING] Failed to parse provider "{name}": {e}, skipping')
 						continue
